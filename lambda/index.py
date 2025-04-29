@@ -47,6 +47,29 @@ def lambda_handler(event, context):
         print("Processing message:", message)
         print("conversation_history:", conversation_history)
         
+        # 会話履歴を使用
+        messages = conversation_history.copy()
+        
+        # ユーザーメッセージを追加
+        messages.append({
+            "role": "user",
+            "content": message
+        })
+        
+        # 会話履歴を含めたプロンプトを作成 ... FastAPIで構築したGemmaでは使えない？
+        gemma_messages = []
+        for msg in messages:
+            if msg["role"] == "user":
+                gemma_messages.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": msg["content"]}]
+                })
+            elif msg["role"] == "assistant":
+                gemma_messages.append({
+                    "role": "assistant", 
+                    "content": [{"type": "text", "text": msg["content"]}]
+                })
+        
         # リクエストを構築
         url = "https://dff2-34-16-230-163.ngrok-free.app/generate"
         data = {
@@ -58,6 +81,7 @@ def lambda_handler(event, context):
         }
         req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'))
         req.add_header('Content-Type', 'application/json')
+        print("request body: ", json.dumps(data))
         
         # FastAPIにリクエスト
         try:
@@ -74,30 +98,6 @@ def lambda_handler(event, context):
         
         """
         print("Using model:", MODEL_ID)
-        
-        # 会話履歴を使用
-        messages = conversation_history.copy()
-        
-        # ユーザーメッセージを追加
-        messages.append({
-            "role": "user",
-            "content": message
-        })
-        
-        # Nova Liteモデル用のリクエストペイロードを構築
-        # 会話履歴を含める
-        bedrock_messages = []
-        for msg in messages:
-            if msg["role"] == "user":
-                bedrock_messages.append({
-                    "role": "user",
-                    "content": [{"text": msg["content"]}]
-                })
-            elif msg["role"] == "assistant":
-                bedrock_messages.append({
-                    "role": "assistant", 
-                    "content": [{"text": msg["content"]}]
-                })
         
         # invoke_model用のリクエストペイロード
         request_payload = {
@@ -142,7 +142,6 @@ def lambda_handler(event, context):
         assistant_response = response_body['generated_text']
         response_time = response_body['response_time']
         print(f"Gemma {response_time:.2f}sec")
-        messages = []
         
         # 成功レスポンスの返却
         return {
