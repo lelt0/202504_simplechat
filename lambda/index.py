@@ -4,7 +4,7 @@ import os
 import boto3
 import re  # 正規表現モジュールをインポート
 from botocore.exceptions import ClientError
-
+import urllib.request
 
 # Lambda コンテキストからリージョンを抽出する関数
 def extract_region_from_arn(arn):
@@ -22,6 +22,23 @@ MODEL_ID = os.environ.get("MODEL_ID", "us.amazon.nova-lite-v1:0")
 
 def lambda_handler(event, context):
     try:
+        req = urllib.request.Request("https://dff2-34-16-230-163.ngrok-free.app/generate", 
+            data='{"prompt": "who are you?", "max_new_tokens": 512, "do_sample": true, "temperature": 0.7, "top_p": 0.9}'.encode('utf-8')
+        )
+        req.add_header('Content-Type', 'application/json')
+        try:
+            with urllib.request.urlopen(req) as response:
+                result = response.read().decode('utf-8')
+                print("FastAPI Response:", result)
+        except urllib.error.HTTPError as e:
+            print(f"FastAPI HTTP Error: {e.code} - {e.reason}")
+            print(e.read().decode('utf-8'))
+            result = None
+        except urllib.error.URLError as e:
+            print(f"FastAPI URL Error: {e.reason}")
+            result = None
+        
+        """
         # コンテキストから実行リージョンを取得し、クライアントを初期化
         global bedrock_client
         if bedrock_client is None:
@@ -105,6 +122,11 @@ def lambda_handler(event, context):
             "role": "assistant",
             "content": assistant_response
         })
+        """
+        
+        response_body = json.loads(result)
+        assistant_response = response_body['generated_text']
+        messages = []
         
         # 成功レスポンスの返却
         return {
