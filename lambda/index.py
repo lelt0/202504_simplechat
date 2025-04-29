@@ -22,22 +22,6 @@ MODEL_ID = os.environ.get("MODEL_ID", "us.amazon.nova-lite-v1:0")
 
 def lambda_handler(event, context):
     try:
-        req = urllib.request.Request("https://dff2-34-16-230-163.ngrok-free.app/generate", 
-            data='{"prompt": "who are you?", "max_new_tokens": 512, "do_sample": true, "temperature": 0.7, "top_p": 0.9}'.encode('utf-8')
-        )
-        req.add_header('Content-Type', 'application/json')
-        try:
-            with urllib.request.urlopen(req) as response:
-                result = response.read().decode('utf-8')
-                print("FastAPI Response:", result)
-        except urllib.error.HTTPError as e:
-            print(f"FastAPI HTTP Error: {e.code} - {e.reason}")
-            print(e.read().decode('utf-8'))
-            result = None
-        except urllib.error.URLError as e:
-            print(f"FastAPI URL Error: {e.reason}")
-            result = None
-        
         """
         # コンテキストから実行リージョンを取得し、クライアントを初期化
         global bedrock_client
@@ -45,6 +29,7 @@ def lambda_handler(event, context):
             region = extract_region_from_arn(context.invoked_function_arn)
             bedrock_client = boto3.client('bedrock-runtime', region_name=region)
             print(f"Initialized Bedrock client in region: {region}")
+        """
         
         print("Received event:", json.dumps(event))
         
@@ -60,6 +45,34 @@ def lambda_handler(event, context):
         conversation_history = body.get('conversationHistory', [])
         
         print("Processing message:", message)
+        print("conversation_history:", conversation_history)
+        
+        # リクエストを構築
+        url = "https://dff2-34-16-230-163.ngrok-free.app/generate"
+        data = {
+            "prompt": message,
+            "max_new_tokens": 512,
+            "do_sample": True,
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
+        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'))
+        req.add_header('Content-Type', 'application/json')
+        
+        # FastAPIにリクエスト
+        try:
+            with urllib.request.urlopen(req) as response:
+                result = response.read().decode('utf-8')
+                print("FastAPI Response:", result)
+        except urllib.error.HTTPError as e:
+            print(f"FastAPI HTTP Error: {e.code} - {e.reason}")
+            print(e.read().decode('utf-8'))
+            raise e
+        except urllib.error.URLError as e:
+            print(f"FastAPI URL Error: {e.reason}")
+            raise e
+        
+        """
         print("Using model:", MODEL_ID)
         
         # 会話履歴を使用
@@ -124,8 +137,11 @@ def lambda_handler(event, context):
         })
         """
         
+        # レスポンスを解析
         response_body = json.loads(result)
         assistant_response = response_body['generated_text']
+        response_time = response_body['response_time']
+        print(f"Gemma {response_time:.2f}sec")
         messages = []
         
         # 成功レスポンスの返却
